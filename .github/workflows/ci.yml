@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+      - ci
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  main:
+    name: Build
+    runs-on: windows-2019
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up variables
+        id: vars
+        run: |
+          $version = Select-String -Path ./keycastow.rc `
+                     -CaseSensitive -Pattern 'FileVersion"\s*,\s*"([^"]+)' |`
+                     Select-Object -First 1 |`
+                     %{$_.Matches.Groups[1].value}
+          Write-Output "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@v1
+
+      - name: Build
+        run: |
+          msbuild -p:Configuration=Release -p:PlatformToolset=v142
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          if-no-files-found: error
+          name: keycastow-${{ steps.vars.outputs.version }}-x86
+          path: |
+            Release\keycastow.exe
+            Release\keycastow.pdb
+
